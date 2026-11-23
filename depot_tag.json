@@ -1,0 +1,15 @@
+{
+  "day": "2026-11-23",
+  "spent_today_eur": 199.99771506000002,
+  "trades_today": 1,
+  "realized_pnl_today_eur": -1.0,
+  "killed": false,
+  "kill_reason": "",
+  "positions": {
+    "AAPL": {
+      "quantity": 0.639522,
+      "avg_price": 312.73
+    }
+  },
+  "paper_cash_eur": 799.00228494
+}
