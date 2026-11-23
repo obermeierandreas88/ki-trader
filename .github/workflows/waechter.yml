@@ -1,1 +1,67 @@
+name: KI-Trader Börsen-Wächter
+
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: waechter
+  cancel-in-progress: false
+
+jobs:
+  waechter:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.veroeffentlichen.outputs.page_url }}
+    steps:
+      - name: Dateien holen
+        uses: actions/checkout@v7
+
+      - name: Python einrichten
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Pakete installieren
+        run: pip install yfinance requests
+
+      - name: Börsen-Wächter ausführen
+        env:
+          KI_CLOUD: "1"
+          NTFY_THEMA: ${{ secrets.NTFY_THEMA }}
+          MEIN_DEPOT: ${{ secrets.MEIN_DEPOT }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python bot.py
+
+      - name: Seite zusammenstellen
+        run: |
+          mkdir -p _site
+          cp berichte/dashboard.html _site/index.html
+          cp icon-192.png icon-512.png manifest.webmanifest _site/
+
+      - name: Seite hochladen
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Seite veröffentlichen
+        id: veroeffentlichen
+        uses: actions/deploy-pages@v5
+
+      - name: Spielgeld-Depot speichern
+        run: |
+          git config user.name "KI-Trader Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in ki_signale_log.json depot_tag.json vergleich_tag.json hoechstkurse_tag.json; do
+            if [ -f "$f" ]; then git add -f "$f"; fi
+          done
+          git commit -m "Stand $(date +%F)" || echo "Nichts Neues zu speichern"
+          git push
