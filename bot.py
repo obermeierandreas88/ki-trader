@@ -111,7 +111,7 @@ PRIVAT_DATEI = Path("einstellungen_privat.json")
 IN_DER_CLOUD = os.getenv("KI_CLOUD") == "1"
 
 
-def _lade_privat() -> tuple[str, dict[str, tuple[float, float]]]:
+def _lade_privat() -> tuple[str, dict[str, tuple[float, float]], str]:
     daten = {}
     if PRIVAT_DATEI.exists():
         try:
@@ -125,11 +125,13 @@ def _lade_privat() -> tuple[str, dict[str, tuple[float, float]]]:
             depot_roh = json.loads(os.environ["MEIN_DEPOT"])
         except ValueError:
             print("Achtung: MEIN_DEPOT ist kein gültiges JSON – wird ignoriert.")
+    depot_roh = dict(depot_roh)
+    passwort = str(depot_roh.pop("_pin", "") or daten.get("depot_passwort", ""))
     depot = {n: (float(v[0]), float(v[1])) for n, v in depot_roh.items()}
-    return thema.strip(), depot
+    return thema.strip(), depot, passwort.strip()
 
 
-NTFY_THEMA, MEIN_DEPOT = _lade_privat()
+NTFY_THEMA, MEIN_DEPOT, DEPOT_PASSWORT = _lade_privat()
 
 
 # ---------------------------------------------------------------------------
@@ -585,8 +587,20 @@ def lauf(kurs_lader=None, broker=None,
             "alarme": alarme, "alarme_neu": neu, "aktien": infos,
             "fehler": [f.strip() for f in fehler], "depot": posten,
             "depot_verbergen": IN_DER_CLOUD,
+            "depot_tresor": depot_tresor(posten, alarme, neu),
             "strategie": dict(STRATEGIE_INFO)}
     return z, alarme, dash
+
+
+def depot_tresor(posten: list[dict], alarme: list[str], neu: list[str]) -> dict | None:
+    """In der Cloud: Depot mit Passwort verschlüsselt für die öffentliche Seite."""
+    if not (IN_DER_CLOUD and DEPOT_PASSWORT and posten):
+        return None
+    from dashboard import NAMEN
+    from tresor import verschluesseln
+    posten = [dict(p, voll=NAMEN.get(p["name"], p["name"])) for p in posten]
+    depot_alarme = [{"text": a, "neu": a in neu} for a in alarme if a.startswith("MEIN DEPOT")]
+    return verschluesseln({"posten": posten, "alarme": depot_alarme}, DEPOT_PASSWORT)
 
 
 def uhrzeit_berlin() -> str:

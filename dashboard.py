@@ -117,6 +117,107 @@ def _aktie_karte(a: dict) -> str:
 </article>"""
 
 
+def _tresor_html(tresor: dict) -> str:
+    import json as _json
+    daten = _json.dumps(tresor).replace("</", "<\\/")
+    return f"""
+<div id="tresor-zu">
+  <p class="klein">🔒 Dein Depot ist verschlüsselt. Nur mit deinem Passwort sichtbar –
+  das Entschlüsseln passiert nur hier auf deinem Gerät.</p>
+  <form id="tresor-form" class="tresor-form" autocomplete="off">
+    <input id="tresor-pw" type="password" placeholder="Passwort" autocomplete="current-password">
+    <button type="submit">Depot anzeigen</button>
+  </form>
+  <label class="klein merken"><input id="tresor-merken" type="checkbox"> auf diesem Gerät merken</label>
+  <p id="tresor-fehler" class="fehler" hidden>Passwort falsch.</p>
+</div>
+<div id="tresor-auf" hidden></div>
+<script type="application/json" id="tresor-daten">{daten}</script>
+<script>
+(function () {{
+  const SPEICHER = "ki-trader-depot-pw";
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const eur = w => new Intl.NumberFormat("de-DE", {{style: "currency", currency: "EUR",
+      maximumFractionDigits: Math.abs(w) < 1 ? 4 : 2}}).format(w);
+  const pz = w => (w > 0 ? "+" : "") + w.toLocaleString("de-DE", {{maximumFractionDigits: 1,
+      minimumFractionDigits: 1}}) + " %";
+  const kl = w => w > 0 ? "plus" : (w < 0 ? "minus" : "neutral");
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}})[c]);
+
+  async function oeffnen(pw) {{
+    const t = JSON.parse(document.getElementById("tresor-daten").textContent);
+    const salt = b64(t.salt), nonce = b64(t.nonce), geheim = b64(t.daten), tag = b64(t.tag);
+    const basis = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
+    const bits = new Uint8Array(await crypto.subtle.deriveBits(
+      {{name: "PBKDF2", salt, iterations: t.runden, hash: "SHA-256"}}, basis, 512));
+    const hm = {{name: "HMAC", hash: "SHA-256"}};
+    const kEnc = await crypto.subtle.importKey("raw", bits.slice(0, 32), hm, false, ["sign"]);
+    const kMac = await crypto.subtle.importKey("raw", bits.slice(32), hm, false, ["verify"]);
+    const msg = new Uint8Array(salt.length + nonce.length + geheim.length);
+    msg.set(salt); msg.set(nonce, salt.length); msg.set(geheim, salt.length + nonce.length);
+    if (!(await crypto.subtle.verify("HMAC", kMac, tag, msg))) throw new Error("falsch");
+    const klar = new Uint8Array(geheim.length);
+    for (let i = 0; i * 32 < geheim.length; i++) {{
+      const blk = new Uint8Array(nonce.length + 4); blk.set(nonce);
+      new DataView(blk.buffer).setUint32(nonce.length, i);
+      const ks = new Uint8Array(await crypto.subtle.sign("HMAC", kEnc, blk));
+      for (let j = 0; j < 32 && i * 32 + j < geheim.length; j++) klar[i * 32 + j] = geheim[i * 32 + j] ^ ks[j];
+    }}
+    return JSON.parse(new TextDecoder().decode(klar));
+  }}
+
+  function zeigen(d) {{
+    const einsatz = d.posten.reduce((a, p) => a + p.einsatz, 0);
+    const wert = d.posten.reduce((a, p) => a + p.wert, 0);
+    const diff = einsatz ? (wert / einsatz - 1) * 100 : 0;
+    const zeilen = d.posten.slice().sort((a, b) => b.wert - a.wert).map(p =>
+      `<tr><td>${{esc(p.voll || p.name)}}<small>Einsatz ${{eur(p.einsatz)}}</small></td>` +
+      `<td>${{eur(p.wert)}}</td><td class="${{kl(p.diff)}}">${{pz(p.diff)}}</td></tr>`).join("");
+    const alarme = (d.alarme || []).map(a =>
+      `<li>${{a.neu ? '<b class="neu">NEU</b> ' : ""}}${{esc(a.text.replace("MEIN DEPOT ", ""))}}</li>`).join("");
+    const el = document.getElementById("tresor-auf");
+    el.innerHTML = `<div class="gross ${{kl(diff)}}">${{eur(wert)}}</div>` +
+      `<div class="klein">Einsatz ${{eur(einsatz)}} · <b class="${{kl(diff)}}">${{pz(diff)}}</b> · ` +
+      `${{(wert - einsatz >= 0 ? "+" : "") + eur(wert - einsatz)}}</div>` +
+      `<table>${{zeilen}}</table>` +
+      (alarme ? `<div class="klein" style="margin-top:10px">Warnungen:</div><ul class="depot-alarme">${{alarme}}</ul>` : "") +
+      `<p class="klein"><a href="#" id="tresor-sperren">🔒 wieder sperren</a></p>`;
+    el.hidden = false;
+    document.getElementById("tresor-zu").hidden = true;
+    document.getElementById("tresor-sperren").onclick = e => {{
+      e.preventDefault();
+      try {{ localStorage.removeItem(SPEICHER); }} catch (x) {{}}
+      el.hidden = true; el.innerHTML = "";
+      document.getElementById("tresor-zu").hidden = false;
+    }};
+  }}
+
+  async function versuchen(pw, merken) {{
+    try {{
+      zeigen(await oeffnen(pw));
+      if (merken) try {{ localStorage.setItem(SPEICHER, pw); }} catch (x) {{}}
+      return true;
+    }} catch (x) {{
+      document.getElementById("tresor-fehler").hidden = false;
+      return false;
+    }}
+  }}
+
+  document.getElementById("tresor-form").addEventListener("submit", e => {{
+    e.preventDefault();
+    document.getElementById("tresor-fehler").hidden = true;
+    versuchen(document.getElementById("tresor-pw").value, document.getElementById("tresor-merken").checked);
+  }});
+  let gemerkt = null;
+  try {{ gemerkt = localStorage.getItem(SPEICHER); }} catch (x) {{}}
+  if (gemerkt) versuchen(gemerkt, false).then(ok => {{
+    if (!ok) {{ try {{ localStorage.removeItem(SPEICHER); }} catch (x) {{}}
+      document.getElementById("tresor-fehler").hidden = true; }}
+  }});
+}})();
+</script>"""
+
+
 def erstelle_dashboard(d: dict) -> str:
     verbergen = d.get("depot_verbergen", False)
     alarme = [a for a in d["alarme"] if not (verbergen and a.startswith("MEIN DEPOT"))]
@@ -137,7 +238,10 @@ def erstelle_dashboard(d: dict) -> str:
     karten = "".join(_aktie_karte(a) for a in d["aktien"])
     fehler = "".join(f'<p class="fehler">{escape(f)}</p>' for f in d.get("fehler", []))
 
-    if verbergen:
+    tresor = d.get("depot_tresor")
+    if verbergen and tresor:
+        depot_html = _tresor_html(tresor)
+    elif verbergen:
         depot_html = ('<p class="klein">Diese Seite ist öffentlich erreichbar. Deinen echten '
                       'Depotwert bekommst du deshalb nur per Push-Nachricht aufs Handy.</p>')
     elif d["depot"]:
@@ -240,6 +344,14 @@ details.news {{ margin-top:8px; }}
 details.news li {{ margin:6px 0; line-height:1.35; }}
 details.news a {{ color:var(--text); text-decoration:none; font-weight:500; }}
 details.news small {{ display:block; color:var(--leise); font-size:11px; }}
+.tresor-form {{ display:flex; gap:8px; margin:10px 0 6px; }}
+.tresor-form input {{ flex:1; font:inherit; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--linie); background:var(--bg); color:var(--text); min-width:0; }}
+.tresor-form button {{ font:inherit; font-weight:600; padding:10px 14px; border-radius:10px; border:0;
+  background:var(--plus); color:#fff; }}
+.merken {{ display:flex; gap:6px; align-items:center; }}
+td small {{ display:block; color:var(--leise); font-size:11px; }}
+ul.depot-alarme {{ margin:4px 0 0; padding-left:18px; font-size:13px; }}
 b.neu {{ background:var(--warn); color:#fff; border-radius:4px; padding:0 5px; font-size:11px; }}
 .ziel {{ margin-top:8px; font-size:13px; background:var(--bg); border-radius:8px; padding:6px 8px; }}
 .ziel.erreicht {{ background:var(--plus-bg); color:var(--plus); font-weight:600; }}
