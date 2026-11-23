@@ -8,10 +8,16 @@ from __future__ import annotations
 
 from html import escape
 
-NAMEN = {"AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "Nvidia", "AMZN": "Amazon", "SAP": "SAP"}
+NAMEN = {"AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "Nvidia", "AMZN": "Amazon", "SAP": "SAP", "BTC": "Bitcoin", "SOL": "Solana", "ETH": "Ethereum", "SPCX": "SpaceX", "INSP": "Inspect", "SKL": "SKALE", "NAVX": "NAVI Protocol", "XEM": "NEM", "SWELL": "Swell Network", "ESE": "eesee", "UTK": "xMoney (UTK)", "IREN": "IREN", "BSB": "Block Street", "IFX": "Infineon", "ARM": "Arm", "NEO": "NEO", "META": "Meta", "ANET": "Arista", "AVGO": "Broadcom", "TSM": "TSMC", "NEOPM": "Neo Perf. Materials", "ANT": "Anthropic",
+         "XMN": "xMoney (XMN)"}
 
 
 def _eur(w: float) -> str:
+    if w != 0 and abs(w) < 1:
+        # Kleine Kurse (z. B. Krypto-Token): 3 gültige Stellen zeigen
+        from math import floor, log10
+        stellen = min(10, max(2, -int(floor(log10(abs(w)))) + 2))
+        return f"{w:.{stellen}f} €".replace(".", ",")
     return f"{w:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
@@ -49,6 +55,38 @@ def _rsi_text(r) -> str:
     return f"{r:.0f} · normal"
 
 
+def _kaufziel_html(k) -> str:
+    if not k:
+        return ""
+    if k["erreicht"]:
+        text = (f"🎯 Kaufziel {_eur(k['ziel'])} erreicht – für {_eur(k['betrag'])} "
+                f"ca. {k['stueck']:.2f} Stück".replace(".", ",", 1))
+        return f'<div class="ziel erreicht">{text}</div>'
+    return (f'<div class="ziel">🎯 Kaufziel {_eur(k["ziel"])} ({_eur(k["betrag"])}) – '
+            f'noch {_pz(k["abstand"])} entfernt</div>')
+
+
+def _breite_html(b) -> str:
+    if not b:
+        return ""
+    return (f'<div class="breite"><div class="breite-kopf">Übliche Spanne in 30 Tagen '
+            f'<span>keine Prognose</span></div>'
+            f'<div class="breite-zeile"><b>{_eur(b["von68"])} – {_eur(b["bis68"])}</b>'
+            f'<small>in 2 von 3 Fällen (−{b["runter68"]:.0f} % / +{b["hoch68"]:.0f} %)</small></div>'
+            f'<div class="breite-zeile"><b>{_eur(b["von90"])} – {_eur(b["bis90"])}</b>'
+            f'<small>in 9 von 10 Fällen</small></div></div>')
+
+
+def _news_html(news) -> str:
+    if not news:
+        return ""
+    punkte = "".join(
+        f'<li><a href="{escape(n["url"])}" target="_blank" rel="noopener">{escape(n["titel"])}</a>'
+        f'<small>{escape(n["quelle"])}{" · " + escape(n["datum"]) if n["datum"] else ""}</small></li>'
+        for n in news)
+    return f'<details class="news"><summary>Nachrichten ({len(news)})</summary><ul>{punkte}</ul></details>'
+
+
 def _aktie_karte(a: dict) -> str:
     name = escape(a["name"])
     voll = escape(NAMEN.get(a["name"], a["name"]))
@@ -65,14 +103,16 @@ def _aktie_karte(a: dict) -> str:
     <div class="rechts"><div class="preis">{_eur(a['preis'])}</div>
       <div class="tag {_farbe(a['tag'])}">{_pz(a['tag'])} heute</div></div>
   </header>
-  {_sparkline(a['verlauf'])}
-  <div class="unter-spark">letzte 6 Monate</div>
+  {(_sparkline(a['verlauf']) + '<div class="unter-spark">letzte 6 Monate</div>') if len(a['verlauf']) > 1 else '<div class="unter-spark">nur aktueller Preis von Bitpanda, kein Verlauf</div>'}
   <div class="chips">{chips}</div>
   <dl>
     <div><dt>Trend</dt><dd class="{trend_kl}">{trend}</dd></div>
     <div><dt>Vom Jahreshoch</dt><dd>{_pz(a['vom_hoch'])}</dd></div>
     <div><dt>RSI</dt><dd>{_rsi_text(a['rsi'])}</dd></div>
   </dl>
+  {_breite_html(a.get("breite"))}
+  {_kaufziel_html(a.get("kaufziel"))}
+  {_news_html(a.get("news"))}
   {alarm}
 </article>"""
 
@@ -80,12 +120,19 @@ def _aktie_karte(a: dict) -> str:
 def erstelle_dashboard(d: dict) -> str:
     verbergen = d.get("depot_verbergen", False)
     alarme = [a for a in d["alarme"] if not (verbergen and a.startswith("MEIN DEPOT"))]
-    if alarme:
-        alarm_html = ('<section class="alarmbox"><h2>⚠ ' + str(len(alarme)) + " Alarm"
-                      + ("e" if len(alarme) != 1 else "") + "</h2><ul>"
-                      + "".join(f"<li>{escape(a)}</li>" for a in alarme) + "</ul></section>")
+    neu_set = set(d.get("alarme_neu", []))
+    neue = [a for a in alarme if a in neu_set]
+    alte = [a for a in alarme if a not in neu_set]
+    if neue:
+        alarm_html = ('<section class="alarmbox"><h2>⚠ ' + str(len(neue)) + " neue"
+                      + (" Alarme" if len(neue) != 1 else "r Alarm") + "</h2><ul>"
+                      + "".join(f"<li>{escape(a)}</li>" for a in neue) + "</ul>")
     else:
-        alarm_html = '<section class="ruhig">✓ Keine Alarme – alles ruhig</section>'
+        alarm_html = '<section class="ruhig"><b>✓ Keine neuen Alarme</b>'
+    if alte:
+        alarm_html += (f'<details><summary>{len(alte)} weiter bestehende Hinweise anzeigen</summary><ul>'
+                       + "".join(f"<li>{escape(a)}</li>" for a in alte) + "</ul></details>")
+    alarm_html += "</section>"
 
     karten = "".join(_aktie_karte(a) for a in d["aktien"])
     fehler = "".join(f'<p class="fehler">{escape(f)}</p>' for f in d.get("fehler", []))
@@ -154,7 +201,10 @@ h2 {{ font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(
 .alarmbox h2 {{ color:inherit; margin:0 0 6px; font-size:15px; text-transform:none; letter-spacing:0; }}
 .alarmbox ul {{ margin:0; padding-left:18px; }}
 .alarmbox li {{ margin:3px 0; color:var(--text); }}
-.ruhig {{ background:var(--plus-bg); color:var(--plus); border-radius:14px; padding:12px 14px; font-weight:600; }}
+.ruhig {{ background:var(--plus-bg); color:var(--plus); border-radius:14px; padding:12px 14px; }}
+details {{ margin-top:8px; color:var(--text); font-size:13px; }}
+details summary {{ cursor:pointer; color:var(--leise); font-weight:600; }}
+details ul {{ margin:6px 0 0; padding-left:18px; }}
 .karte {{ background:var(--karte); border-radius:16px; padding:14px; margin-bottom:12px;
   box-shadow:0 1px 2px rgba(0,0,0,.06); border:1px solid var(--linie); }}
 .karte.hat-alarm {{ border-color:var(--warn); }}
@@ -180,6 +230,19 @@ dt {{ color:var(--leise); }} dd {{ margin:0; font-weight:600; }}
   border-radius:8px; padding:5px 8px; }}
 .plus {{ color:var(--plus); }} .minus {{ color:var(--minus); }} .neutral {{ color:var(--leise); }}
 .warn {{ color:var(--warn); }}
+.breite {{ margin-top:10px; background:var(--bg); border-radius:10px; padding:8px 10px; }}
+.breite-kopf {{ font-size:12px; color:var(--leise); display:flex; justify-content:space-between; }}
+.breite-kopf span {{ font-size:11px; border:1px solid var(--linie); border-radius:6px; padding:0 5px; }}
+.breite-zeile {{ display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  margin-top:4px; font-variant-numeric:tabular-nums; }}
+.breite-zeile small {{ color:var(--leise); font-size:12px; text-align:right; }}
+details.news {{ margin-top:8px; }}
+details.news li {{ margin:6px 0; line-height:1.35; }}
+details.news a {{ color:var(--text); text-decoration:none; font-weight:500; }}
+details.news small {{ display:block; color:var(--leise); font-size:11px; }}
+b.neu {{ background:var(--warn); color:#fff; border-radius:4px; padding:0 5px; font-size:11px; }}
+.ziel {{ margin-top:8px; font-size:13px; background:var(--bg); border-radius:8px; padding:6px 8px; }}
+.ziel.erreicht {{ background:var(--plus-bg); color:var(--plus); font-weight:600; }}
 dd {{ text-align:right; max-width:62%; }}
 .block {{ background:var(--karte); border:1px solid var(--linie); border-radius:16px; padding:14px; }}
 .gross {{ font-size:26px; font-weight:700; }}
@@ -203,11 +266,11 @@ code {{ font-size:12px; }}
   {fehler}
   <h2>Mein Depot</h2>
   <section class="block">{depot_html}</section>
-  <h2>Strategie-Test</h2>
-  <section class="block">{strat_html}</section>
+  {('<h2>Strategie-Test</h2><section class="block">' + strat_html + '</section>') if st else ''}
   <footer>
     Kurse in Euro, Tagesschluss (Yahoo Finance, kann verzögert sein).<br>
     RSI unter 30 = stark gefallen, über 70 = stark gestiegen. Trend = Ø50 gegen Ø200 Tage.<br>
+    „Übliche Spanne“ = bisherige Kursschwankung auf 30 Tage hochgerechnet – keine Vorhersage.<br>
     Keine Anlageberatung – du entscheidest selbst.
   </footer>
 </main>
@@ -217,9 +280,14 @@ code {{ font-size:12px; }}
 
 def push_text(d: dict) -> tuple[str, str]:
     """Kurzer Text für die Push-Nachricht. Titel nur mit einfachen Zeichen."""
-    n = len(d["alarme"])
-    titel = f"KI-Trader: {n} Alarm" + ("e" if n != 1 else "") if n else "KI-Trader: alles ruhig"
-    zeilen = [f"⚠ {a}" for a in d["alarme"]]
+    neu = d.get("alarme_neu", d["alarme"])
+    n = len(neu)
+    titel = (f"KI-Trader: {n} neue" + (" Alarme" if n != 1 else "r Alarm")) if n \
+        else "KI-Trader: keine neuen Alarme"
+    zeilen = [f"⚠ {a}" for a in neu]
+    weiter = len(d["alarme"]) - n
+    if weiter > 0:
+        zeilen.append(f"(+ {weiter} bestehende Hinweise, siehe App)")
     if zeilen:
         zeilen.append("")
     for a in d["aktien"]:
