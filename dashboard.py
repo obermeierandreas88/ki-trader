@@ -243,6 +243,15 @@ def _ki_kopf_html(ki) -> str:
                      f'<p class="klein">Erfolgskontrolle seit {escape(str(k["seit"]))}: je {_eur(100)} pro Wert, '
                      f'{k["wechsel"]} Wechsel. Die KI liegt <b class="{_farbe(diff)}">'
                      f'{"vorne" if diff > 0 else "hinten" if diff < 0 else "gleichauf"} ({_eur(diff)})</b>.</p>')
+    b = k.get("bilanz") or {}
+    if b.get("bewertet"):
+        teile = [f'{typ} {b[typ][0]} von {b[typ][1]} richtig ({b[typ][0] / b[typ][1] * 100:.0f} %)'
+                 for typ in ("Verkaufen", "Kaufen") if b[typ][1]]
+        kontrolle += (f'<p class="klein">🎯 Trefferquote (Kurs 5 Läufe später): {escape(" · ".join(teile))}. '
+                      f'Die KI bekommt diese Bilanz bei jeder Anfrage mitgeteilt.</p>')
+    elif k.get("werte"):
+        kontrolle += ('<p class="klein">🎯 Trefferquote: erste Auswertung nach 5 Läufen '
+                      '(ca. 1 Woche). Danach bekommt die KI ihre Bilanz mitgeteilt.</p>')
     return (f'<h2>KI-Einschätzung</h2><section class="block ki-block">'
             f'<p>🤖 {escape(ki.get("fazit", ""))}</p>{kontrolle}'
             f'<p class="klein">KI-Meinung ({escape(ki.get("anbieter", "KI"))}), keine Anlageberatung.'

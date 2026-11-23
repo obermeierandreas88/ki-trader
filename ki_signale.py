@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 MISTRAL_MODELL = "mistral-small-latest"
@@ -33,6 +33,8 @@ LOG_DATEI = Path("ki_signale_log.json")
 OHNE_SIGNAL: set[str] = set()      # wird je nach Anbieter gesetzt (Claude -> {"ANT"})
 GEBUEHR = 1.0
 START_BETRAG = 100.0              # virtueller Betrag je Wert für die Erfolgskontrolle
+PRUEF_ABSTAND = 5                 # ein Signal wird nach 5 weiteren Läufen (~1 Woche) bewertet
+HISTORIE_TAGE = 180
 SIGNALE = ("Kaufen", "Halten", "Verkaufen")
 
 ANWEISUNG = """Du bist ein nüchterner, vorsichtiger Börsen-Analyst. Du bekommst Kennzahlen und
@@ -84,12 +86,13 @@ def _json_aus_text(text: str) -> dict:
 
 
 def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
-             anbieter: str = "mistral") -> dict:
+             anbieter: str = "mistral", rueckmeldung: str = "") -> dict:
     """Gibt {"fazit": str, "signale": {kuerzel: {...}}} zurück. post = requests.post (für Tests)."""
     if post is None:
         import requests
         post = requests.post
-    frage = "Datum: " + date.today().isoformat() + "\nWerte:\n" + _eingabe(infos, besitz)
+    frage = ("Datum: " + date.today().isoformat() + rueckmeldung
+             + "\nWerte:\n" + _eingabe(infos, besitz))
     if anbieter == "mistral":
         import time
 
@@ -193,6 +196,14 @@ def erfolgskontrolle(signale: dict, preise: dict[str, float], heute: str | None 
             w["offen"], w["letztes_signal"] = neu, neu
         w["letzter_preis"] = preis
 
+    # Verlauf für die Bilanz: heutiges Signal + Kurs je Wert (pro Tag nur ein Eintrag)
+    hist = [h for h in log.get("historie", []) if h["d"] != heute]
+    for name, preis in preise.items():
+        if name in signale and preis > 0:
+            hist.append({"d": heute, "n": name, "s": signale[name]["signal"], "p": preis})
+    grenze = (date.fromisoformat(heute) - timedelta(days=HISTORIE_TAGE)).isoformat() \
+        if len(heute) == 10 else ""
+    log["historie"] = [h for h in hist if h["d"] >= grenze]
     LOG_DATEI.write_text(json.dumps(log, indent=1, ensure_ascii=False), encoding="utf-8")
 
     ki = halten = 0.0
@@ -203,7 +214,49 @@ def erfolgskontrolle(signale: dict, preise: dict[str, float], heute: str | None 
         halten += START_BETRAG / w["start_preis"] * p
         wechsel += w["wechsel"]
     return {"seit": log["start"], "werte": len(werte), "ki": ki, "halten": halten,
-            "einsatz": START_BETRAG * len(werte), "wechsel": wechsel, "geaendert": geaendert}
+            "einsatz": START_BETRAG * len(werte), "wechsel": wechsel, "geaendert": geaendert,
+            "bilanz": bilanz(log)}
+
+
+# ---------------------------------------------------------------------------
+# Bilanz: Wie oft lag die KI richtig? (Rückmeldung an die KI und Anzeige in der App)
+# ---------------------------------------------------------------------------
+def bilanz(log: dict | None = None) -> dict:
+    """Bewertet jedes Kaufen/Verkaufen-Signal, das mindestens PRUEF_ABSTAND Läufe alt ist:
+    richtig, wenn der Kurs danach in die vorhergesagte Richtung ging."""
+    log = log if log is not None else _lade_log()
+    nach_wert: dict[str, list[dict]] = {}
+    for h in sorted(log.get("historie", []), key=lambda x: x["d"]):
+        nach_wert.setdefault(h["n"], []).append(h)
+    gesamt = {"Kaufen": [0, 0], "Verkaufen": [0, 0]}
+    pro_wert: dict[str, list[int]] = {}
+    for name, eintraege in nach_wert.items():
+        for i, h in enumerate(eintraege):
+            if h["s"] not in gesamt or i + PRUEF_ABSTAND >= len(eintraege):
+                continue
+            spaeter = eintraege[i + PRUEF_ABSTAND]["p"]
+            richtig = (spaeter > h["p"]) if h["s"] == "Kaufen" else (spaeter < h["p"])
+            gesamt[h["s"]][0] += richtig
+            gesamt[h["s"]][1] += 1
+            pw = pro_wert.setdefault(name, [0, 0])
+            pw[0] += richtig
+            pw[1] += 1
+    return {"Kaufen": gesamt["Kaufen"], "Verkaufen": gesamt["Verkaufen"], "pro_wert": pro_wert,
+            "bewertet": gesamt["Kaufen"][1] + gesamt["Verkaufen"][1]}
+
+
+def bilanz_text(b: dict) -> str:
+    """Kurzer Text für die KI-Anfrage."""
+    if not b or not b.get("bewertet"):
+        return ""
+    teile = [f"{typ}: {b[typ][0]} von {b[typ][1]} richtig" for typ in ("Kaufen", "Verkaufen") if b[typ][1]]
+    werte = [f"{n} {r}/{a}" for n, (r, a) in sorted(b["pro_wert"].items()) if a >= 2]
+    return ("\n\nDeine eigene bisherige Bilanz (jedes Kaufen/Verkaufen-Signal wurde "
+            f"{PRUEF_ABSTAND} Läufe später geprüft: lief der Kurs in die vorhergesagte Richtung?): "
+            + "; ".join(teile) + "."
+            + (" Pro Wert (richtig/gesamt): " + ", ".join(werte) + "." if werte else "")
+            + " Berücksichtige das: Wo du oft falsch lagst, sei vorsichtiger (eher Halten, niedrigere "
+              "Sicherheit). Die Stichprobe ist klein – zieh daraus keine starken Schlüsse.")
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +276,8 @@ def ki_auswertung(infos: list[dict], besitz: set[str], preise: dict[str, float],
         OHNE_SIGNAL.add("ANT")   # Anthropic-KI gibt kein Signal zur Anthropic-Aktie
     name = "Mistral" if anbieter == "mistral" else "Claude"
     try:
-        ergebnis = frage_ki(infos, besitz, api_key, post=post, anbieter=anbieter)
+        ergebnis = frage_ki(infos, besitz, api_key, post=post, anbieter=anbieter,
+                            rueckmeldung=bilanz_text(bilanz()))
     except Exception as ex:  # noqa: BLE001
         return {"fehler": str(ex)[:300], "signale": {}, "fazit": "", "kontrolle": None,
                 "anbieter": name}
