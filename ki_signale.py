@@ -23,6 +23,8 @@ from datetime import date
 from pathlib import Path
 
 MISTRAL_MODELL = "mistral-small-latest"
+MISTRAL_ERSATZ = "ministral-8b-latest"   # kleineres Modell, falls das große ausgelastet ist
+WARTEZEITEN = (20, 60)                   # Sekunden Pause vor erneutem Versuch bei "zu viele Anfragen"
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 CLAUDE_MODELL = "claude-haiku-5-5"
 CLAUDE_VERSION = "2026-10-21"
@@ -89,14 +91,26 @@ def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
         post = requests.post
     frage = "Datum: " + date.today().isoformat() + "\nWerte:\n" + _eingabe(infos, besitz)
     if anbieter == "mistral":
-        antwort = post(
-            MISTRAL_URL, timeout=90,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-                     "Accept": "application/json"},
-            json={"model": MISTRAL_MODELL, "max_tokens": 4000, "temperature": 0.3,
-                  "response_format": {"type": "json_object"},
-                  "messages": [{"role": "system", "content": ANWEISUNG},
-                               {"role": "user", "content": frage}]})
+        import time
+
+        def senden(modell):
+            return post(
+                MISTRAL_URL, timeout=90,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+                         "Accept": "application/json"},
+                json={"model": modell, "max_tokens": 3000, "temperature": 0.3,
+                      "response_format": {"type": "json_object"},
+                      "messages": [{"role": "system", "content": ANWEISUNG},
+                                   {"role": "user", "content": frage}]})
+        # Bei "zu viele Anfragen" (429) bzw. Überlastung (503): warten und erneut versuchen,
+        # zuletzt mit dem kleineren Ersatzmodell.
+        versuche = [(MISTRAL_MODELL, 0)] + [(MISTRAL_MODELL, w) for w in WARTEZEITEN] + [(MISTRAL_ERSATZ, 30)]
+        for modell, pause in versuche:
+            if pause:
+                time.sleep(pause)
+            antwort = senden(modell)
+            if antwort.status_code not in (429, 503):
+                break
     else:
         antwort = post(
             CLAUDE_URL, timeout=90,
