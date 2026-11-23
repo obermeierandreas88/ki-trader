@@ -232,7 +232,8 @@ def _ki_kopf_html(ki) -> str:
     if not ki:
         return ""
     if ki.get("fehler"):
-        return f'<section class="block ki-block"><p class="klein">🤖 KI-Einschätzung heute nicht verfügbar.</p></section>'
+        return ('<h2>KI-Einschätzung</h2><section class="block ki-block"><p class="klein">'
+                '🤖 KI-Einschätzung heute nicht verfügbar – alles andere ist aktuell.</p></section>')
     k = ki.get("kontrolle") or {}
     kontrolle = ""
     if k.get("werte"):
@@ -244,7 +245,8 @@ def _ki_kopf_html(ki) -> str:
                      f'{"vorne" if diff > 0 else "hinten" if diff < 0 else "gleichauf"} ({_eur(diff)})</b>.</p>')
     return (f'<h2>KI-Einschätzung</h2><section class="block ki-block">'
             f'<p>🤖 {escape(ki.get("fazit", ""))}</p>{kontrolle}'
-            f'<p class="klein">KI-Meinung (Claude), keine Anlageberatung. Für Anthropic gibt es bewusst kein Signal.</p>'
+            f'<p class="klein">KI-Meinung ({escape(ki.get("anbieter", "KI"))}), keine Anlageberatung.'
+            f'{" Für Anthropic gibt es bewusst kein Signal." if "ANT" in (ki.get("ohne_signal") or []) else ""}</p>'
             f'</section>')
 
 

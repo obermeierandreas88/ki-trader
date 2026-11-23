@@ -585,7 +585,7 @@ def lauf(kurs_lader=None, broker=None,
     z += ["", f"WEITER BESTEHENDE HINWEISE ({len(bestehend)}):"] + (
         [f"  - {a}" for a in bestehend] or ["  keine"])
     if ki:
-        z += ["", "KI-EINSCHÄTZUNG (KI-Meinung, keine Anlageberatung):"]
+        z += ["", f"KI-EINSCHÄTZUNG ({ki.get('anbieter', 'KI')} – KI-Meinung, keine Anlageberatung):"]
         if ki.get("fehler"):
             z.append(f"  nicht verfügbar: {ki['fehler']}")
         else:

@@ -1,14 +1,16 @@
 """
 ki_signale.py – KI-Einschätzung (Kaufen / Halten / Verkaufen) mit Erfolgskontrolle
 
-- Eine Anfrage pro Lauf an die Claude API (Modell in KI_MODELL), mit allen Werten auf einmal
+- Anbieter: Mistral (Umgebungsvariable MISTRAL_API_KEY) – oder Claude (ANTHROPIC_API_KEY).
+  Ist MISTRAL_API_KEY gesetzt, wird Mistral benutzt.
+- Eine Anfrage pro Lauf mit allen Werten auf einmal
 - Die KI bekommt: Kursentwicklung, Trend, RSI, übliche Spanne, Schlagzeilen,
   und ob du den Wert besitzt (ohne Beträge)
-- Anthropic (ANT) bekommt bewusst KEIN Signal (Interessenkonflikt: die KI stammt von Anthropic)
+- Bei Claude bekommt Anthropic (ANT) bewusst KEIN Signal (Interessenkonflikt). Bei Mistral schon.
 - Erfolgskontrolle: Jedes Signal wird am NÄCHSTEN Lauf zum dann gültigen Kurs virtuell
   ausgeführt (1 € Gebühr je Wechsel) und mit einfachem Halten verglichen.
 
-Ohne API-Schlüssel (Umgebungsvariable ANTHROPIC_API_KEY) wird alles übersprungen.
+Ohne API-Schlüssel wird alles übersprungen.
 Das ist eine KI-Meinung, keine Anlageberatung.
 """
 
@@ -20,11 +22,13 @@ import re
 from datetime import date
 from pathlib import Path
 
-KI_MODELL = "claude-haiku-5-5"
-API_VERSION = "2026-10-21"
-API_URL = "https://api.anthropic.com/v1/messages"
+MISTRAL_MODELL = "mistral-small-latest"
+MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
+CLAUDE_MODELL = "claude-haiku-5-5"
+CLAUDE_VERSION = "2026-10-21"
+CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 LOG_DATEI = Path("ki_signale_log.json")
-OHNE_SIGNAL = {"ANT"}              # Anthropic: kein Signal von einer Anthropic-KI
+OHNE_SIGNAL: set[str] = set()      # wird je nach Anbieter gesetzt (Claude -> {"ANT"})
 GEBUEHR = 1.0
 START_BETRAG = 100.0              # virtueller Betrag je Wert für die Erfolgskontrolle
 SIGNALE = ("Kaufen", "Halten", "Verkaufen")
@@ -77,22 +81,39 @@ def _json_aus_text(text: str) -> dict:
     return json.loads(text[start:ende + 1])
 
 
-def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None) -> dict:
+def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
+             anbieter: str = "mistral") -> dict:
     """Gibt {"fazit": str, "signale": {kuerzel: {...}}} zurück. post = requests.post (für Tests)."""
     if post is None:
         import requests
         post = requests.post
-    antwort = post(
-        API_URL, timeout=90,
-        headers={"Authorization": f"Bearer {api_key}", "anthropic-version": API_VERSION,
-                 "content-type": "application/json"},
-        json={"model": KI_MODELL, "max_tokens": 4000, "system": ANWEISUNG,
-              "messages": [{"role": "user", "content":
-                            "Datum: " + date.today().isoformat() + "\nWerte:\n" + _eingabe(infos, besitz)}]})
+    frage = "Datum: " + date.today().isoformat() + "\nWerte:\n" + _eingabe(infos, besitz)
+    if anbieter == "mistral":
+        antwort = post(
+            MISTRAL_URL, timeout=90,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+                     "Accept": "application/json"},
+            json={"model": MISTRAL_MODELL, "max_tokens": 4000, "temperature": 0.3,
+                  "response_format": {"type": "json_object"},
+                  "messages": [{"role": "system", "content": ANWEISUNG},
+                               {"role": "user", "content": frage}]})
+    else:
+        antwort = post(
+            CLAUDE_URL, timeout=90,
+            headers={"Authorization": f"Bearer {api_key}", "anthropic-version": CLAUDE_VERSION,
+                     "content-type": "application/json"},
+            json={"model": CLAUDE_MODELL, "max_tokens": 4000, "system": ANWEISUNG,
+                  "messages": [{"role": "user", "content": frage}]})
     if antwort.status_code >= 400:
         raise RuntimeError(f"KI-Anfrage fehlgeschlagen (HTTP {antwort.status_code}): {antwort.text[:200]}")
-    teile = antwort.json().get("content", [])
-    text = "".join(t.get("text", "") for t in teile if t.get("type") == "text")
+    daten = antwort.json()
+    if anbieter == "mistral":
+        inhalt = ((daten.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+        if isinstance(inhalt, list):  # manche Modelle liefern Teile statt Text
+            inhalt = "".join(t.get("text", "") for t in inhalt if isinstance(t, dict))
+        text = inhalt or ""
+    else:
+        text = "".join(t.get("text", "") for t in daten.get("content", []) if t.get("type") == "text")
     roh = _json_aus_text(text)
     gueltige = {a["name"] for a in infos} - OHNE_SIGNAL
     signale = {}
@@ -175,14 +196,25 @@ def erfolgskontrolle(signale: dict, preise: dict[str, float], heute: str | None 
 # Einstieg für bot.py
 # ---------------------------------------------------------------------------
 def ki_auswertung(infos: list[dict], besitz: set[str], preise: dict[str, float],
-                  post=None, api_key: str | None = None) -> dict | None:
-    api_key = api_key if api_key is not None else os.getenv("ANTHROPIC_API_KEY", "").strip()
+                  post=None, api_key: str | None = None, anbieter: str | None = None) -> dict | None:
+    if api_key is None:
+        mistral = os.getenv("MISTRAL_API_KEY", "").strip()
+        claude = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        anbieter, api_key = ("mistral", mistral) if mistral else ("claude", claude)
+    anbieter = anbieter or "mistral"
     if not api_key:
         return None
+    OHNE_SIGNAL.clear()
+    if anbieter == "claude":
+        OHNE_SIGNAL.add("ANT")   # Anthropic-KI gibt kein Signal zur Anthropic-Aktie
+    name = "Mistral" if anbieter == "mistral" else "Claude"
     try:
-        ergebnis = frage_ki(infos, besitz, api_key, post=post)
+        ergebnis = frage_ki(infos, besitz, api_key, post=post, anbieter=anbieter)
     except Exception as ex:  # noqa: BLE001
-        return {"fehler": str(ex)[:300], "signale": {}, "fazit": "", "kontrolle": None}
+        return {"fehler": str(ex)[:300], "signale": {}, "fazit": "", "kontrolle": None,
+                "anbieter": name}
     ergebnis["kontrolle"] = erfolgskontrolle(ergebnis["signale"], preise)
     ergebnis["fehler"] = None
+    ergebnis["anbieter"] = name
+    ergebnis["ohne_signal"] = sorted(OHNE_SIGNAL)
     return ergebnis
