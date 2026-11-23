@@ -568,12 +568,34 @@ def lauf(kurs_lader=None, broker=None,
     alarme_gestern += mein_depot_zeilen(preise_gestern)[1]
     neu = neue_alarme(alarme, alarme_gestern)
 
+    # KI-Einschätzung (nur mit ANTHROPIC_API_KEY)
+    from dashboard import NAMEN
+    from ki_signale import ki_auswertung
+    for info in infos:
+        info["voll"] = NAMEN.get(info["name"], info["name"])
+    ki = ki_auswertung(infos, set(MEIN_DEPOT), preise)
+    if ki:
+        for info in infos:
+            info["ki"] = ki["signale"].get(info["name"])
+
     titel = f"KI-TRADER BÖRSEN-WÄCHTER – {date.today().strftime('%d.%m.%Y')}"
     z = [titel, ""]
     z += [f"NEUE ALARME ({len(neu)}):"] + ([f"  ! {a}" for a in neu] or ["  keine"])
     bestehend = [a for a in alarme if a not in neu]
     z += ["", f"WEITER BESTEHENDE HINWEISE ({len(bestehend)}):"] + (
         [f"  - {a}" for a in bestehend] or ["  keine"])
+    if ki:
+        z += ["", "KI-EINSCHÄTZUNG (KI-Meinung, keine Anlageberatung):"]
+        if ki.get("fehler"):
+            z.append(f"  nicht verfügbar: {ki['fehler']}")
+        else:
+            z.append(f"  Fazit: {ki['fazit']}")
+            for n, sg in ki["signale"].items():
+                z.append(f"  {n:6} {sg['signal'].upper():9} (Sicherheit {sg['sicherheit']}): {sg['begruendung']}")
+            k = ki["kontrolle"]
+            if k and k["werte"]:
+                z.append(f"  Erfolgskontrolle seit {k['seit']}: Signale folgen {k['ki']:.2f} € "
+                         f"vs. Halten {k['halten']:.2f} € (Einsatz {k['einsatz']:.0f} €, {k['wechsel']} Wechsel)")
     z += ["", "ÜBERBLICK (Kurse in €):"] + ueberblick + fehler
     z += ["", "MEIN DEPOT:"] + depot
     if STRATEGIE_WERTE and all(n in alle for n in STRATEGIE_WERTE):
@@ -585,6 +607,7 @@ def lauf(kurs_lader=None, broker=None,
           "Das ist keine Anlageberatung. Du entscheidest selbst."]
     dash = {"datum": date.today().strftime("%d.%m.%Y"), "zeit": uhrzeit_berlin(),
             "alarme": alarme, "alarme_neu": neu, "aktien": infos,
+            "ki": ({k: v for k, v in ki.items() if k != "signale"} if ki else None),
             "fehler": [f.strip() for f in fehler], "depot": posten,
             "depot_verbergen": IN_DER_CLOUD,
             "depot_tresor": depot_tresor(posten, alarme, neu),
@@ -613,14 +636,15 @@ def uhrzeit_berlin() -> str:
 
 
 def sende_push(dash: dict) -> None:
-    if not NTFY_THEMA or (PUSH_NUR_BEI_ALARM and not dash["alarme_neu"]):
+    ki_aenderungen = ((dash.get("ki") or {}).get("kontrolle") or {}).get("geaendert") or []
+    if not NTFY_THEMA or (PUSH_NUR_BEI_ALARM and not dash["alarme_neu"] and not ki_aenderungen):
         return
     import requests
     titel, text = push_text(dash)
     try:
         requests.post(f"https://ntfy.sh/{NTFY_THEMA}", data=text.encode("utf-8"), timeout=15,
                       headers={"Title": titel,
-                               "Priority": "high" if dash["alarme_neu"] else "default",
+                               "Priority": "high" if (dash["alarme_neu"] or ki_aenderungen) else "default",
                                "Tags": "warning" if dash["alarme_neu"] else "chart_with_upwards_trend"})
     except Exception as ex:  # noqa: BLE001
         log.warning("Push-Nachricht fehlgeschlagen: %s", ex)

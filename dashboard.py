@@ -87,6 +87,15 @@ def _news_html(news) -> str:
     return f'<details class="news"><summary>Nachrichten ({len(news)})</summary><ul>{punkte}</ul></details>'
 
 
+def _ki_html(k) -> str:
+    if not k:
+        return ""
+    kl = {"Kaufen": "plus", "Verkaufen": "minus"}.get(k["signal"], "warn")
+    return (f'<div class="ki"><div class="ki-kopf"><span class="ki-badge {kl}">KI: {escape(k["signal"])}</span>'
+            f'<small>Sicherheit {escape(k["sicherheit"])}</small></div>'
+            f'<div class="ki-text">{escape(k["begruendung"])}</div></div>')
+
+
 def _aktie_karte(a: dict) -> str:
     name = escape(a["name"])
     voll = escape(NAMEN.get(a["name"], a["name"]))
@@ -110,6 +119,7 @@ def _aktie_karte(a: dict) -> str:
     <div><dt>Vom Jahreshoch</dt><dd>{_pz(a['vom_hoch'])}</dd></div>
     <div><dt>RSI</dt><dd>{_rsi_text(a['rsi'])}</dd></div>
   </dl>
+  {_ki_html(a.get("ki"))}
   {_breite_html(a.get("breite"))}
   {_kaufziel_html(a.get("kaufziel"))}
   {_news_html(a.get("news"))}
@@ -216,6 +226,26 @@ def _tresor_html(tresor: dict) -> str:
   }});
 }})();
 </script>"""
+
+
+def _ki_kopf_html(ki) -> str:
+    if not ki:
+        return ""
+    if ki.get("fehler"):
+        return f'<section class="block ki-block"><p class="klein">🤖 KI-Einschätzung heute nicht verfügbar.</p></section>'
+    k = ki.get("kontrolle") or {}
+    kontrolle = ""
+    if k.get("werte"):
+        diff = k["ki"] - k["halten"]
+        kontrolle = (f'<div class="vergleich"><div><span>Den KI-Signalen folgen</span><b>{_eur(k["ki"])}</b></div>'
+                     f'<div><span>Einfach halten</span><b>{_eur(k["halten"])}</b></div></div>'
+                     f'<p class="klein">Erfolgskontrolle seit {escape(str(k["seit"]))}: je {_eur(100)} pro Wert, '
+                     f'{k["wechsel"]} Wechsel. Die KI liegt <b class="{_farbe(diff)}">'
+                     f'{"vorne" if diff > 0 else "hinten" if diff < 0 else "gleichauf"} ({_eur(diff)})</b>.</p>')
+    return (f'<h2>KI-Einschätzung</h2><section class="block ki-block">'
+            f'<p>🤖 {escape(ki.get("fazit", ""))}</p>{kontrolle}'
+            f'<p class="klein">KI-Meinung (Claude), keine Anlageberatung. Für Anthropic gibt es bewusst kein Signal.</p>'
+            f'</section>')
 
 
 def erstelle_dashboard(d: dict) -> str:
@@ -352,6 +382,12 @@ details.news small {{ display:block; color:var(--leise); font-size:11px; }}
 .merken {{ display:flex; gap:6px; align-items:center; }}
 td small {{ display:block; color:var(--leise); font-size:11px; }}
 ul.depot-alarme {{ margin:4px 0 0; padding-left:18px; font-size:13px; }}
+.ki {{ margin-top:10px; border:1px solid var(--linie); border-radius:10px; padding:8px 10px; }}
+.ki-kopf {{ display:flex; justify-content:space-between; align-items:center; }}
+.ki-kopf small {{ color:var(--leise); font-size:12px; }}
+.ki-badge {{ font-weight:700; font-size:13px; }}
+.ki-text {{ font-size:13px; margin-top:4px; line-height:1.4; }}
+.ki-block p {{ margin:4px 0 8px; }}
 b.neu {{ background:var(--warn); color:#fff; border-radius:4px; padding:0 5px; font-size:11px; }}
 .ziel {{ margin-top:8px; font-size:13px; background:var(--bg); border-radius:8px; padding:6px 8px; }}
 .ziel.erreicht {{ background:var(--plus-bg); color:var(--plus); font-weight:600; }}
@@ -373,6 +409,7 @@ code {{ font-size:12px; }}
 <main>
   <div class="kopf"><h1>KI-Trader</h1><span>Stand {escape(d['datum'])}{(' · ' + escape(d['zeit']) + ' Uhr') if d.get('zeit') else ''}</span></div>
   {alarm_html}
+  {_ki_kopf_html(d.get("ki"))}
   <h2>Deine Aktien</h2>
   {karten}
   {fehler}
@@ -394,9 +431,22 @@ def push_text(d: dict) -> tuple[str, str]:
     """Kurzer Text für die Push-Nachricht. Titel nur mit einfachen Zeichen."""
     neu = d.get("alarme_neu", d["alarme"])
     n = len(neu)
-    titel = (f"KI-Trader: {n} neue" + (" Alarme" if n != 1 else "r Alarm")) if n \
-        else "KI-Trader: keine neuen Alarme"
-    zeilen = [f"⚠ {a}" for a in neu]
+    ki = d.get("ki") or {}
+    aend = (ki.get("kontrolle") or {}).get("geaendert") or []
+    if n:
+        titel = f"KI-Trader: {n} neue" + (" Alarme" if n != 1 else "r Alarm")
+    elif aend:
+        titel = f"KI-Trader: {len(aend)} neue KI-Signale"
+    else:
+        titel = "KI-Trader: keine neuen Alarme"
+    zeilen = []
+    if ki.get("fazit"):
+        zeilen += [f"🤖 {ki['fazit']}"]
+    if aend:
+        zeilen += ["KI-Signal geändert: " + "; ".join(aend)]
+    if zeilen:
+        zeilen.append("")
+    zeilen += [f"⚠ {a}" for a in neu]
     weiter = len(d["alarme"]) - n
     if weiter > 0:
         zeilen.append(f"(+ {weiter} bestehende Hinweise, siehe App)")
