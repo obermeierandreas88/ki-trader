@@ -1,0 +1,8 @@
+# Private Daten nie hochladen
+einstellungen_privat.json
+start_bot.bat
+berichte/
+bot.log
+__pycache__/
+.pytest_cache/
+_site/
