@@ -60,7 +60,7 @@ AKTIEN = {              # Name -> Kürzel bei Yahoo Finance
 # Kaufziele: Alarm, sobald der Kurs auf oder unter den Zielpreis (in €) fällt.
 # Name: (Zielpreis in €, geplanter Betrag in €). Der Bot kauft NICHT selbst.
 KAUFZIELE: dict[str, tuple[float, float]] = {
-    "ANT": (79.00, 100.00),
+    # "ANT": (79.00, 100.00),  -> am 26.11.2026 gekauft, Ziel erledigt
 }
 # Kürzel mit "cg:" holen die Kurse von CoinGecko statt Yahoo Finance
 # (für kleine Kryptowährungen, die Yahoo nicht kennt).
