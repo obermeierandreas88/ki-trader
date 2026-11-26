@@ -11,7 +11,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 55056.44140625
+   "letzter_preis": 55185.6796875
   },
   "SOL": {
    "start_preis": 65.93000030517578,
@@ -23,7 +23,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 64.58000183105469
+   "letzter_preis": 64.88999938964844
   },
   "ETH": {
    "start_preis": 1567.989990234375,
@@ -35,7 +35,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 1539.8599853515625
+   "letzter_preis": 1546.1600341796875
   },
   "SPCX": {
    "start_preis": 116.53169872869398,
@@ -47,7 +47,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 116.13607934731833
+   "letzter_preis": 116.16155763488337
   },
   "INSP": {
    "start_preis": 3.338913944120681e-05,
@@ -56,10 +56,10 @@
    "geld": 107.74318044523362,
    "investiert": false,
    "wechsel": 1,
-   "offen": "Verkaufen",
+   "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
-   "letztes_signal": "Verkaufen",
-   "letzter_preis": 3.630841215166219e-05
+   "letztes_signal": "Halten",
+   "letzter_preis": 3.631637760194283e-05
   },
   "SKL": {
    "start_preis": 0.002656174823641777,
@@ -71,7 +71,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 0.0025675047654658556
+   "letzter_preis": 0.002577658277004957
   },
   "NAVX": {
    "start_preis": 0.007026770849095841,
@@ -83,7 +83,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 0.006796249073203984
+   "letzter_preis": 0.006882672124965542
   },
   "XEM": {
    "start_preis": 0.00033494667150080204,
@@ -92,10 +92,10 @@
    "geld": 0.0,
    "investiert": true,
    "wechsel": 0,
-   "offen": "Verkaufen",
+   "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
-   "letztes_signal": "Verkaufen",
-   "letzter_preis": 0.0002737967879511416
+   "letztes_signal": "Halten",
+   "letzter_preis": 0.0002831729070749134
   },
   "SWELL": {
    "start_preis": 0.0004645218283857812,
@@ -107,7 +107,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 0.00044635476359572413
+   "letzter_preis": 0.00044207747965226265
   },
   "ESE": {
    "start_preis": 0.002947033052429144,
@@ -119,7 +119,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 0.002527567937882261
+   "letzter_preis": 0.0025317247526942337
   },
   "UTK": {
    "start_preis": 0.0058,
@@ -140,10 +140,10 @@
    "geld": 107.64252747066881,
    "investiert": false,
    "wechsel": 1,
-   "offen": "Verkaufen",
+   "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
-   "letztes_signal": "Verkaufen",
-   "letzter_preis": 11.71020586414053
+   "letztes_signal": "Halten",
+   "letzter_preis": 11.71277488484563
   },
   "BSB": {
    "start_preis": 0.061691748468152896,
@@ -155,7 +155,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 0.05944874476070034
+   "letzter_preis": 0.061224505430401026
   },
   "IFX": {
    "start_preis": 47.209999084472656,
@@ -179,7 +179,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 147.18406448599146
+   "letzter_preis": 147.21635417530283
   },
   "NEO": {
    "start_preis": 1.4212051630020142,
@@ -191,7 +191,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 1.4198769330978394
+   "letzter_preis": 1.4336192607879639
   },
   "META": {
    "start_preis": 511.43000685723433,
@@ -203,7 +203,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 555.7927948637168
+   "letzter_preis": 555.9147263834797
   },
   "ANET": {
    "start_preis": 152.85266947304524,
@@ -215,7 +215,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 149.4440985975166
+   "letzter_preis": 149.47688410000956
   },
   "AVGO": {
    "start_preis": 277.59147494022204,
@@ -227,7 +227,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 274.1737167439789
+   "letzter_preis": 274.23386581080837
   },
   "TSM": {
    "start_preis": 290.63163346104227,
@@ -239,7 +239,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 311.9744524231133
+   "letzter_preis": 312.0428943307138
   },
   "NEOPM": {
    "start_preis": 13.201823947382984,
@@ -251,7 +251,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 14.643574847499751
+   "letzter_preis": 14.71162536154179
   },
   "ANT": {
    "start_preis": 81.07703017835333,
@@ -263,7 +263,7 @@
    "offen": "Halten",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Halten",
-   "letzter_preis": 75.4465311620732
+   "letzter_preis": 75.46308285236216
   },
   "ALGS": {
    "start_preis": 2.0595380821501124,
@@ -275,7 +275,7 @@
    "offen": "Kaufen",
    "ausgefuehrt_am": "2026-11-26",
    "letztes_signal": "Kaufen",
-   "letzter_preis": 2.0595380821501124
+   "letzter_preis": 2.0599899099008256
   }
  },
  "historie": [
@@ -415,61 +415,61 @@
    "d": "2026-11-26",
    "n": "BTC",
    "s": "Halten",
-   "p": 55056.44140625
+   "p": 55185.6796875
   },
   {
    "d": "2026-11-26",
    "n": "SOL",
    "s": "Halten",
-   "p": 64.58000183105469
+   "p": 64.88999938964844
   },
   {
    "d": "2026-11-26",
    "n": "ETH",
    "s": "Halten",
-   "p": 1539.8599853515625
+   "p": 1546.1600341796875
   },
   {
    "d": "2026-11-26",
    "n": "SPCX",
    "s": "Halten",
-   "p": 116.13607934731833
+   "p": 116.16155763488337
   },
   {
    "d": "2026-11-26",
    "n": "INSP",
-   "s": "Verkaufen",
-   "p": 3.630841215166219e-05
+   "s": "Halten",
+   "p": 3.631637760194283e-05
   },
   {
    "d": "2026-11-26",
    "n": "SKL",
    "s": "Halten",
-   "p": 0.0025675047654658556
+   "p": 0.002577658277004957
   },
   {
    "d": "2026-11-26",
    "n": "NAVX",
    "s": "Halten",
-   "p": 0.006796249073203984
+   "p": 0.006882672124965542
   },
   {
    "d": "2026-11-26",
    "n": "XEM",
-   "s": "Verkaufen",
-   "p": 0.0002737967879511416
+   "s": "Halten",
+   "p": 0.0002831729070749134
   },
   {
    "d": "2026-11-26",
    "n": "SWELL",
    "s": "Halten",
-   "p": 0.00044635476359572413
+   "p": 0.00044207747965226265
   },
   {
    "d": "2026-11-26",
    "n": "ESE",
    "s": "Halten",
-   "p": 0.002527567937882261
+   "p": 0.0025317247526942337
   },
   {
    "d": "2026-11-26",
@@ -480,20 +480,20 @@
   {
    "d": "2026-11-26",
    "n": "IREN",
-   "s": "Verkaufen",
-   "p": 11.71020586414053
+   "s": "Halten",
+   "p": 11.71277488484563
   },
   {
    "d": "2026-11-26",
    "n": "ALGS",
    "s": "Kaufen",
-   "p": 2.0595380821501124
+   "p": 2.0599899099008256
   },
   {
    "d": "2026-11-26",
    "n": "BSB",
    "s": "Halten",
-   "p": 0.05944874476070034
+   "p": 0.061224505430401026
   },
   {
    "d": "2026-11-26",
@@ -505,49 +505,49 @@
    "d": "2026-11-26",
    "n": "ARM",
    "s": "Halten",
-   "p": 147.18406448599146
+   "p": 147.21635417530283
   },
   {
    "d": "2026-11-26",
    "n": "NEO",
    "s": "Halten",
-   "p": 1.4198769330978394
+   "p": 1.4336192607879639
   },
   {
    "d": "2026-11-26",
    "n": "META",
    "s": "Halten",
-   "p": 555.7927948637168
+   "p": 555.9147263834797
   },
   {
    "d": "2026-11-26",
    "n": "ANET",
    "s": "Halten",
-   "p": 149.4440985975166
+   "p": 149.47688410000956
   },
   {
    "d": "2026-11-26",
    "n": "AVGO",
    "s": "Halten",
-   "p": 274.1737167439789
+   "p": 274.23386581080837
   },
   {
    "d": "2026-11-26",
    "n": "TSM",
    "s": "Halten",
-   "p": 311.9744524231133
+   "p": 312.0428943307138
   },
   {
    "d": "2026-11-26",
    "n": "NEOPM",
    "s": "Halten",
-   "p": 14.643574847499751
+   "p": 14.71162536154179
   },
   {
    "d": "2026-11-26",
    "n": "ANT",
    "s": "Halten",
-   "p": 75.4465311620732
+   "p": 75.46308285236216
   }
  ]
 }
