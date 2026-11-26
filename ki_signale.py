@@ -84,7 +84,24 @@ def _json_aus_text(text: str) -> dict:
     start, ende = text.find("{"), text.rfind("}")
     if start < 0 or ende < 0:
         raise ValueError("keine JSON-Antwort")
-    return json.loads(text[start:ende + 1])
+    try:
+        return json.loads(text[start:ende + 1])
+    except ValueError:
+        return _json_retten(text[start:])
+
+
+def _json_retten(text: str) -> dict:
+    """Rettet aus einer abgeschnittenen/fehlerhaften Antwort alle vollständigen Einträge."""
+    signale = {}
+    for treffer in re.finditer(r'"([A-Za-z0-9]+)"\s*:\s*(\{[^{}]*\})', text):
+        try:
+            signale[treffer.group(1)] = json.loads(treffer.group(2))
+        except ValueError:
+            continue
+    if not signale:
+        raise ValueError("Antwort der KI war unvollständig (kein lesbares JSON)")
+    fazit = re.search(r'"fazit"\s*:\s*"((?:[^"\\]|\\.)*)"', text)
+    return {"fazit": json.loads('"' + fazit.group(1) + '"') if fazit else "", "signale": signale}
 
 
 def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
@@ -108,7 +125,7 @@ def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
                     json={"systemInstruction": {"parts": [{"text": ANWEISUNG}]},
                           "contents": [{"role": "user", "parts": [{"text": frage}]}],
                           "generationConfig": {"responseMimeType": "application/json",
-                                               "temperature": 0.3, "maxOutputTokens": 8000}})
+                                               "temperature": 0.3, "maxOutputTokens": 32000}})
                 if antwort.status_code not in (429, 503):
                     break
             # Modell nicht verfügbar/zu ausgelastet -> nächstes Modell probieren
