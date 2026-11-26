@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.veroeffentlichen.outputs.page_url }}
+      url: ${{ steps.veroeffentlichen.outputs.page_url || steps.veroeffentlichen2.outputs.page_url }}
     steps:
       - name: Dateien holen
         uses: actions/checkout@v7
@@ -37,6 +37,7 @@ jobs:
           KI_CLOUD: "1"
           NTFY_THEMA: ${{ secrets.NTFY_THEMA }}
           MEIN_DEPOT: ${{ secrets.MEIN_DEPOT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python bot.py
@@ -54,9 +55,20 @@ jobs:
 
       - name: Seite veröffentlichen
         id: veroeffentlichen
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - name: Kurz warten (nur falls Veröffentlichen gestört war)
+        if: steps.veroeffentlichen.outcome == 'failure'
+        run: sleep 60
+
+      - name: Seite veröffentlichen (2. Versuch)
+        id: veroeffentlichen2
+        if: steps.veroeffentlichen.outcome == 'failure'
         uses: actions/deploy-pages@v5
 
       - name: Spielgeld-Depot speichern
+        if: always()
         run: |
           git config user.name "KI-Trader Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
