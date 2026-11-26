@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from html import escape
 
-NAMEN = {"AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "Nvidia", "AMZN": "Amazon", "SAP": "SAP", "BTC": "Bitcoin", "SOL": "Solana", "ETH": "Ethereum", "SPCX": "SpaceX", "INSP": "Inspect", "SKL": "SKALE", "NAVX": "NAVI Protocol", "XEM": "NEM", "SWELL": "Swell Network", "ESE": "eesee", "UTK": "xMoney (UTK)", "IREN": "IREN", "BSB": "Block Street", "IFX": "Infineon", "ARM": "Arm", "NEO": "NEO", "META": "Meta", "ANET": "Arista", "AVGO": "Broadcom", "TSM": "TSMC", "NEOPM": "Neo Perf. Materials", "ANT": "Anthropic",
+NAMEN = {"AAPL": "Apple", "MSFT": "Microsoft", "NVDA": "Nvidia", "AMZN": "Amazon", "SAP": "SAP", "BTC": "Bitcoin", "SOL": "Solana", "ETH": "Ethereum", "SPCX": "SpaceX", "INSP": "Inspect", "SKL": "SKALE", "NAVX": "NAVI Protocol", "XEM": "NEM", "SWELL": "Swell Network", "ESE": "eesee", "UTK": "xMoney (UTK)", "IREN": "IREN", "ALGS": "Aligos", "BSB": "Block Street", "IFX": "Infineon", "ARM": "Arm", "NEO": "NEO", "META": "Meta", "ANET": "Arista", "AVGO": "Broadcom", "TSM": "TSMC", "NEOPM": "Neo Perf. Materials", "ANT": "Anthropic",
          "XMN": "xMoney (XMN)"}
 
 

@@ -44,6 +44,7 @@ AKTIEN = {              # Name -> Kürzel bei Yahoo Finance
     "ESE": "ESE-USD",   # eesee (Kurs in USD -> wird umgerechnet)
     "UTK": "bp:UTK",    # xMoney, alter Token UTK (nur aktueller Preis direkt von Bitpanda)
     "IREN": "IREN",     # IREN Limited (Nasdaq)
+    "ALGS": "ALGS",     # Aligos Therapeutics (Nasdaq)
     "BSB": "cg:block-street",  # Block Street (Kurse von CoinGecko) – nur Beobachtung
     "IFX": "IFX.DE",    # Infineon (Xetra, in Euro) – nur Beobachtung
     "ARM": "ARM",       # Arm Holdings ADR (Nasdaq) – nur Beobachtung
