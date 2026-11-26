@@ -1,8 +1,8 @@
 """
 ki_signale.py – KI-Einschätzung (Kaufen / Halten / Verkaufen) mit Erfolgskontrolle
 
-- Anbieter: Mistral (Umgebungsvariable MISTRAL_API_KEY) – oder Claude (ANTHROPIC_API_KEY).
-  Ist MISTRAL_API_KEY gesetzt, wird Mistral benutzt.
+- Anbieter (der erste mit Schlüssel wird benutzt):
+  Google Gemini (GEMINI_API_KEY, kostenlose Stufe) > Mistral (MISTRAL_API_KEY) > Claude (ANTHROPIC_API_KEY)
 - Eine Anfrage pro Lauf mit allen Werten auf einmal
 - Die KI bekommt: Kursentwicklung, Trend, RSI, übliche Spanne, Schlagzeilen,
   und ob du den Wert besitzt (ohne Beträge)
@@ -22,6 +22,8 @@ import re
 from datetime import date, timedelta
 from pathlib import Path
 
+GEMINI_MODELLE = ("gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-flash-lite")  # der Reihe nach
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent"
 MISTRAL_MODELL = "mistral-small-latest"
 MISTRAL_ERSATZ = "ministral-8b-latest"   # kleineres Modell, falls das große ausgelastet ist
 WARTEZEITEN = (20, 60)                   # Sekunden Pause vor erneutem Versuch bei "zu viele Anfragen"
@@ -93,7 +95,26 @@ def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
         post = requests.post
     frage = ("Datum: " + date.today().isoformat() + rueckmeldung
              + "\nWerte:\n" + _eingabe(infos, besitz))
-    if anbieter == "mistral":
+    if anbieter == "gemini":
+        import time
+        antwort = None
+        for modell in GEMINI_MODELLE:
+            for pause in (0, 20, 60):
+                if pause:
+                    time.sleep(pause)
+                antwort = post(
+                    GEMINI_URL.format(modell=modell), timeout=120,
+                    headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                    json={"systemInstruction": {"parts": [{"text": ANWEISUNG}]},
+                          "contents": [{"role": "user", "parts": [{"text": frage}]}],
+                          "generationConfig": {"responseMimeType": "application/json",
+                                               "temperature": 0.3, "maxOutputTokens": 8000}})
+                if antwort.status_code not in (429, 503):
+                    break
+            # Modell nicht verfügbar/zu ausgelastet -> nächstes Modell probieren
+            if antwort.status_code not in (404, 429, 503):
+                break
+    elif anbieter == "mistral":
         import time
 
         def senden(modell):
@@ -124,12 +145,18 @@ def frage_ki(infos: list[dict], besitz: set[str], api_key: str, post=None,
     if antwort.status_code >= 400:
         raise RuntimeError(f"KI-Anfrage fehlgeschlagen (HTTP {antwort.status_code}): {antwort.text[:200]}")
     daten = antwort.json()
-    if anbieter == "mistral":
+    if anbieter == "gemini":
+        kandidaten = daten.get("candidates") or [{}]
+        teile = ((kandidaten[0].get("content") or {}).get("parts")) or []
+        text = "".join(t.get("text", "") for t in teile if not t.get("thought"))
+        if not text:
+            raise RuntimeError(f"Gemini lieferte keinen Text (Grund: {kandidaten[0].get('finishReason', '?')})")
+    elif anbieter == "mistral":
         inhalt = ((daten.get("choices") or [{}])[0].get("message") or {}).get("content", "")
         if isinstance(inhalt, list):  # manche Modelle liefern Teile statt Text
             inhalt = "".join(t.get("text", "") for t in inhalt if isinstance(t, dict))
         text = inhalt or ""
-    else:
+    if anbieter == "claude":
         text = "".join(t.get("text", "") for t in daten.get("content", []) if t.get("type") == "text")
     roh = _json_aus_text(text)
     gueltige = {a["name"] for a in infos} - OHNE_SIGNAL
@@ -265,16 +292,20 @@ def bilanz_text(b: dict) -> str:
 def ki_auswertung(infos: list[dict], besitz: set[str], preise: dict[str, float],
                   post=None, api_key: str | None = None, anbieter: str | None = None) -> dict | None:
     if api_key is None:
-        mistral = os.getenv("MISTRAL_API_KEY", "").strip()
-        claude = os.getenv("ANTHROPIC_API_KEY", "").strip()
-        anbieter, api_key = ("mistral", mistral) if mistral else ("claude", claude)
-    anbieter = anbieter or "mistral"
+        anbieter, api_key = "claude", ""
+        for name, variable in (("gemini", "GEMINI_API_KEY"), ("mistral", "MISTRAL_API_KEY"),
+                               ("claude", "ANTHROPIC_API_KEY")):
+            wert = os.getenv(variable, "").strip()
+            if wert:
+                anbieter, api_key = name, wert
+                break
+    anbieter = anbieter or "gemini"
     if not api_key:
         return None
     OHNE_SIGNAL.clear()
     if anbieter == "claude":
         OHNE_SIGNAL.add("ANT")   # Anthropic-KI gibt kein Signal zur Anthropic-Aktie
-    name = "Mistral" if anbieter == "mistral" else "Claude"
+    name = {"gemini": "Gemini", "mistral": "Mistral"}.get(anbieter, "Claude")
     try:
         ergebnis = frage_ki(infos, besitz, api_key, post=post, anbieter=anbieter,
                             rueckmeldung=bilanz_text(bilanz()))

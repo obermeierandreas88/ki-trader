@@ -237,9 +237,10 @@ def _ki_kopf_html(ki) -> str:
         code = _re.search(r"HTTP (\d{3})", f)
         msg = _re.search(r'"message"\s*:\s*"([^"]{1,120})', f)
         erklaerung = {"401": "Schlüssel ungültig oder gelöscht – bitte neuen Schlüssel als Secret eintragen.",
-                      "403": "Zugriff verweigert – ist der kostenlose Plan bei Mistral aktiv?",
-                      "429": "Mistral ist ausgelastet (zu viele Anfragen) – klappt meist beim nächsten Lauf.",
-                      "402": "Plan/Guthaben bei Mistral prüfen."}.get(code.group(1) if code else "", "")
+                      "403": "Zugriff verweigert – Schlüssel bzw. kostenlosen Zugang beim KI-Anbieter prüfen.",
+                      "429": "KI-Anbieter ausgelastet (zu viele Anfragen) – klappt meist beim nächsten Lauf.",
+                      "402": "Plan/Guthaben beim KI-Anbieter prüfen.",
+                      "400": "Anfrage abgelehnt – bei Gemini meist: Schlüssel ungültig."}.get(code.group(1) if code else "", "")
         grund = (f"HTTP {code.group(1)}" if code else f[:80]) + (f" – {msg.group(1)}" if msg else "")
         return ('<h2>KI-Einschätzung</h2><section class="block ki-block"><p class="klein">'
                 '🤖 KI-Einschätzung heute nicht verfügbar – alles andere ist aktuell.</p>'
